@@ -1,0 +1,37 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Define Image Tags
+        run: |
+          IMAGE_NAME="ghcr.io/${{ vars.GH_USERNAME }}/${{ vars.DOCKER_IMAGE_NAME }}"
+          SHA_TAG="$IMAGE_NAME:sha-${{ github.sha }}"
+          BRANCH_TAG="$IMAGE_NAME:${{ github.ref_name }}"
+          LATEST_TAG="$IMAGE_NAME:latest"
+
+          echo "SHA_TAG=$SHA_TAG" >> $GITHUB_ENV
+          echo "BRANCH_TAG=$BRANCH_TAG" >> $GITHUB_ENV
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      - name: Build Docker Image
+        run: docker build -t $SHA_TAG -t $BRANCH_TAG -t $LATEST_TAG .
+
+      - name: Push Docker Images to GHCR
+        run: |
+          docker push $SHA_TAG
+          docker push $BRANCH_TAG
+          docker push $LATEST_TAG
